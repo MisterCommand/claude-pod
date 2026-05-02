@@ -59,7 +59,7 @@ You land in a bash shell at the same path your project lives at on the host (e.g
 claude --dangerously-skip-permissions
 ```
 
-By default, the container network is fully isolated. If you want to expose a dev server to your host, pass the `PORTS` variable (e.g., `PORTS=3000 claude-pod`). To exit, type `exit`.
+By default, no container ports are published to the host, so any dev server you start is unreachable from your browser until you opt in. Outbound traffic from the container is **not** restricted — see [What is and isn't isolated](#what-is-and-isnt-isolated) below. To expose a dev server, pass the `PORTS` variable (e.g., `PORTS=3000 claude-pod`). To exit, type `exit`.
 
 ### Skip the shell, go straight into Claude
 
