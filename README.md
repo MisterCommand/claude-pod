@@ -64,7 +64,7 @@ Alternatively, you may skip the shell and go straight into Claude. Anything you 
 ~/tools/claude-pod/claude-pod claude --dangerously-skip-permissions
 ```
 
-By default, no container ports are published to the host, so any dev server you start is unreachable from your browser until you opt in. Outbound traffic from the container is **not** restricted — see [What is and isn't isolated](#what-is-and-isnt-isolated) below. To expose a dev server, pass the `PORTS` variable (e.g., `PORTS=3000 claude-pod`). To exit, type `exit`.
+To exit, type `exit`.
 
 <details>
 <summary><strong>More usage patterns</strong> (aliases, drop straight into Claude, piping)</summary>
