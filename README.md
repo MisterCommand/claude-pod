@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-![claude-pod](assets/cover.png)
+![claude-pod](assets/cover.jpeg)
 
 ## Install & run
 
