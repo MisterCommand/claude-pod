@@ -1,22 +1,24 @@
 # claude-pod
 
-> **Unofficial** Docker sandbox for Anthropic's Claude Code CLI. Use `--dangerously-skip-permissions` safely — Claude only sees the project folder you launched from.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+> Unofficial Docker sandbox for Anthropic's Claude Code CLI. Use `--dangerously-skip-permissions` safely — Claude only sees the project folder you launched from.
 
 ![claude-pod](assets/cover.jpeg)
 
 ## Install & run
 
 ```sh
+# Clone the repo
 git clone https://github.com/trekhleb/claude-pod.git ~/tools/claude-pod
 
+# Install claude-pod CLI (builds Docker image)
 cd ~/tools/claude-pod && ./install.sh
 
+# Open your project folder and launch claude code inside container
+# cd ~/Projects/my-work-in-progress-project
 ~/tools/claude-pod/claude-pod claude --dangerously-skip-permissions
 ```
 
-Docker is the only requirement. The install path (`~/tools/claude-pod`) is just a convention — put it wherever.
+Docker is the only requirement. The install path (`~/tools/claude-pod`) is just a convention — put it wherever you want.
 
 ## Requirements & platforms
 
