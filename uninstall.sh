@@ -32,7 +32,7 @@ echo
 info "Removing image '$IMAGE'"
 if docker image inspect "$IMAGE" >/dev/null 2>&1; then
   # Dim + indent the rmi output the same way install.sh dims `docker build` output.
-  docker rmi "$IMAGE" 2>&1 \
+  docker rmi -f "$IMAGE" 2>&1 \
     | sed $'s/\e\\[[0-9;]*m//g' \
     | while IFS= read -r line; do printf '%s  %s%s\n' "$DIM" "$line" "$RESET"; done
   ok "Image '$IMAGE' removed"

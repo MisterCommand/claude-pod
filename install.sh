@@ -37,6 +37,4 @@ echo
 info "Next steps"
 printf '  Open shell in pod:        %s%s/claude-pod%s\n' "$BOLD" "$REPO_DIR" "$RESET"
 printf '  Or run Claude directly:   %s%s/claude-pod claude --dangerously-skip-permissions%s\n' "$BOLD" "$REPO_DIR" "$RESET"
-printf '  Optional shell aliases: %s(add to ~/.zshrc or ~/.bashrc)%s\n' "$DIM" "$RESET"
-printf '    %salias claude-pod=%s/claude-pod%s\n' "$BOLD" "$REPO_DIR" "$RESET"
-printf '    %salias cpod='"'"'%s/claude-pod claude --dangerously-skip-permissions'"'"'%s\n' "$BOLD" "$REPO_DIR" "$RESET"
+printf '  Optional shell aliases:   %salias claude-pod=%s/claude-pod%s\n' "$BOLD" "$REPO_DIR" "$RESET"

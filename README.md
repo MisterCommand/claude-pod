@@ -12,7 +12,7 @@ Unofficial Docker sandbox for Anthropic's Claude Code CLI. Runs [Claude Code](ht
 
 The whole tool is four tiny files:
 
-- **`Dockerfile`** — `node:lts-slim` + `git` + `curl` + `less` + `@anthropic-ai/claude-code`, runs as a non-root user.
+- **`Dockerfile`** — `node:24-slim` + `git` + `curl` + `less` + `@anthropic-ai/claude-code`.
 - **`claude-pod`** — one `docker run` command that mounts your current directory and nothing else.
 - **`install.sh`** — checks Docker and builds the image. Doesn't touch any system path; the tool stays self-contained in this folder.
 - **`uninstall.sh`** — removes the image and `~/.claude-pod/` (auth + session history) after confirmation. Lists what it doesn't touch so you can clean those up yourself.
@@ -59,7 +59,7 @@ You land in a bash shell at the same path your project lives at on the host (e.g
 claude --dangerously-skip-permissions
 ```
 
-A web app started inside the container on port `3000` is reachable from your host machine at `http://localhost:3000`. To exit, type `exit`.
+By default, the container network is fully isolated. If you want to expose a dev server to your host, pass the `PORTS` variable (e.g., `PORTS=3000 claude-pod`). To exit, type `exit`.
 
 ### Skip the shell, go straight into Claude
 
@@ -78,6 +78,18 @@ alias cc='~/tools/claude-pod/claude-pod claude --dangerously-skip-permissions'  
 
 The shell-first form is more flexible (run `npm install`, dev server, tests, then `claude`), so it stays the default.
 
+### Piping Data (Standard Input)
+
+Because `claude-pod` correctly handles TTY detection, you can seamlessly pipe files or command outputs directly into Claude just like a native CLI tool:
+
+```sh
+# Review a git diff (using the alias from above)
+git diff | cc -p "Please review these changes for bugs"
+
+# Analyze a log file
+cat crash.log | cc -p "Why did the server crash?"
+```
+
 ## What is and isn't isolated
 
 **Safe from Claude:**
@@ -91,7 +103,10 @@ The shell-first form is more flexible (run `npm install`, dev server, tests, the
 
 **Where Claude can actually write** — two paths, both intentional bind mounts:
 - The project folder, bind-mounted at the same path inside the container (`$PWD:$PWD`). Edits land on your host's disk directly, no copy.
-- `~/.claude-pod/` on the host, mounted at `/home/node/.claude`. Holds the auth token and session history.
+- `~/.claude-pod/` on the host, mounted at `/home/claude-pod/.claude`. Holds the auth token and session history.
+
+> [!WARNING]
+> Because the current directory (`$PWD`) is mounted into the container, **never run this tool from your root directory (`/`) or `/etc`**. If you run it from the root of your hard drive, you are giving the AI access to your entire machine, defeating the purpose of the sandbox. Always `cd` into your specific project folder first.
 
 Everywhere else Claude writes is either in the container's ephemeral filesystem (discarded on exit thanks to `--rm`) or simply has no path to land at — the Linux kernel's mount namespace makes any other host directory invisible to the container. Symlinks inside the project folder pointing to `~/.ssh` or `/etc/passwd` appear broken for the same reason: those targets aren't mounted, so the container can't see them.
 
@@ -99,14 +114,21 @@ The tradeoff: the worst case becomes "something bad happens to one project folde
 
 ## Customizing
 
-The image is intentionally minimal: `node:lts-slim` + `git` + `curl` + `less` + Claude Code. Nothing language-specific. Anything your projects need (Python, build tools, other toolchains) you add yourself — edit the `Dockerfile` and re-run `./install.sh`.
+The image is intentionally minimal: `node:24-slim` + `git` + `curl` + `less` + Claude Code. Nothing language-specific. Anything your projects need (Python, build tools, other toolchains) you add yourself — edit the `Dockerfile` and re-run `./install.sh`.
 
-**More ports**
+**Exposing Ports**
 
-Add another line to `claude-pod`:
+By default, `claude-pod` isolates the container network to prevent collisions. You can map ports using the `PORTS` environment variable:
 
 ```sh
--p 127.0.0.1:5173:5173 \
+# Map a single port (127.0.0.1:3000 -> container:3000)
+PORTS=3000 claude-pod
+
+# Map multiple ports
+PORTS="3000 5173" claude-pod
+
+# Map a specific host port to a different container port
+PORTS="8080:80" claude-pod
 ```
 
 **Python**
@@ -138,10 +160,10 @@ After any change, re-run `./install.sh` to rebuild.
 Everything this repo causes to exist outside the project you launch it from:
 
 - `~/.claude-pod/` on your host — auth token, settings, and per-project session/conversation history (transcripts can include code snippets and command output Claude saw). Auth and settings are shared across projects (one login, ever); session history lives under `~/.claude-pod/projects/<encoded-host-path>/`, one folder per project, using the same encoding host-Claude uses — so if you ever switch to a host install, you can copy the folders over and keep your transcripts. This is *not* a host Claude install; it's a state directory for the container's Claude, kept on the host so it survives restarts.
-- Docker image `claude-pod` (~600 MB) and its layers, plus the `node:lts-slim` base image, in Docker's image store.
+- Docker image `claude-pod` (~600 MB) and its layers, plus the `node:24-slim` base image, in Docker's image store.
 - Docker build cache from `apt-get` and `npm install` steps.
 - Outbound network during build: Docker Hub, Debian apt mirrors, npm registry. During runtime: `api.anthropic.com` and whatever your project code reaches (network is unrestricted).
-- While a session is running: one container process, port `3000` bound on `127.0.0.1`.
+- While a session is running: one container process, and any ports you explicitly mapped via `PORTS` bound on `127.0.0.1`.
 
 No `sudo`, no writes to `/usr/local/`, `/etc/`, `~/.zshrc`, `~/Library/`, your existing `~/.claude/`, or anywhere else on the host.
 
@@ -151,7 +173,7 @@ No `sudo`, no writes to `/usr/local/`, `/etc/`, `~/.zshrc`, `~/Library/`, your e
 ./uninstall.sh
 ```
 
-Removes `~/.claude-pod/` and the `claude-pod` image after confirmation. Tells you exactly what it isn't touching (`node:lts-slim`, build cache, this repo) and how to clean those up yourself.
+Removes `~/.claude-pod/` and the `claude-pod` image after confirmation. Tells you exactly what it isn't touching (`node:24-slim`, build cache, this repo) and how to clean those up yourself.
 
 ## Notes
 

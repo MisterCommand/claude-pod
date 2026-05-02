@@ -12,7 +12,13 @@ RUN apt-get update \
 ARG CACHEBUST=1
 RUN npm install -g @anthropic-ai/claude-code
 
-# Run as non-root so a process inside the container can't write to system paths even if it tries.
-USER node
+# We DO NOT use `USER node` here. Instead, we pass `--user "$(id -u):$(id -g)"` dynamically
+# at runtime in the `claude-pod` script. This ensures perfect file permission alignment
+# between the host and the container, especially on Linux environments.
+# Create a dedicated, globally writable home directory for our dynamic runtime user.
+RUN mkdir -p /home/claude-pod && chmod 777 /home/claude-pod
+
+# Override the default bash prompt to hide the "I have no name!" warning for dynamic users.
+RUN echo 'PS1="claude-pod:\w\$ "' >> /etc/bash.bashrc
 
 CMD ["bash"]
