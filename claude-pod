@@ -25,6 +25,13 @@ mkdir -p "$HOME/.claude-pod"
 #   - Claude treats an empty file as a JSON parse error, not as "no config", so we seed it with {}.
 [ -s "$HOME/.claude-pod/.claude.json" ] || printf '{}' > "$HOME/.claude-pod/.claude.json"
 
+# Restrict to owner-only. The directory holds the Anthropic auth token and session transcripts
+# (which can contain code, file contents, and command output Claude saw); on multi-user hosts the
+# default 755/644 modes would let other local users read both. Matches the convention used for
+# ~/.ssh, ~/.aws, ~/.gnupg.
+chmod 700 "$HOME/.claude-pod"
+chmod 600 "$HOME/.claude-pod/.claude.json"
+
 # Mounts & Users:
 #   --user -> dynamic                            Runs container exactly as the host user to prevent permission issues.
 #   HOME=/home/claude-pod                        Because user is dynamic, we use a dedicated writable home dir.
