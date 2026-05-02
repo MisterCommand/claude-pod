@@ -4,12 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-<!--
-Demo placeholder. Drop a recording or screenshot in here when you have one, e.g.:
-<p align="center">
-  <img src="assets/install.png" alt="claude-pod install output" width="640">
-</p>
--->
+![claude-pod](assets/cover.png)
 
 ## Install & run
 
