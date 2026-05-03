@@ -47,7 +47,7 @@ The first time you start Claude inside the pod, it will print a login URL. Open 
 
 ## Usage
 
-Call the script by full or relative path from any project:
+Call the script using its full or relative path from any project:
 
 ```sh
 cd ~/Projects/anything
@@ -70,12 +70,14 @@ To exit, type `exit`.
 
 **Aliases**
 
+For your convenience, you can add the following aliases to your shell configuration file (`~/.zshrc`, `~/.bashrc`, etc.):
+
 ```sh
-alias claude-pod=~/tools/claude-pod/claude-pod                                  # shell first
-alias cc='~/tools/claude-pod/claude-pod claude --dangerously-skip-permissions'  # claude directly
+alias claude-pod=~/tools/claude-pod/claude-pod                                  
+alias cc='~/tools/claude-pod/claude-pod claude --dangerously-skip-permissions'  
 ```
 
-The shell-first form is more flexible (run `npm install`, dev server, tests, then `claude`), so it stays the default.
+The shell-first form is more flexible, since you can run `npm install`, dev server, tests, then `claude` directly inside the container, so it is the default.
 
 ## Exposing ports
 
@@ -124,67 +126,29 @@ Pinned versions cache normally across rebuilds. The script prints the resolved v
 - The project folder, bind-mounted at the same path inside the container (`$PWD:$PWD`). Edits land on your host's disk directly, no copy.
 - `~/.claude-pod/` on the host, mounted at `/home/claude-pod/.claude`. Holds the auth token and session history.
 
-> [!WARNING]
-> Because the current directory (`$PWD`) is mounted into the container, **never run this tool from your root directory (`/`) or `/etc`**. If you run it from the root of your hard drive, you are giving the AI access to your entire machine, defeating the purpose of the sandbox. Always `cd` into your specific project folder first.
+> Because the current directory (`$PWD`) is mounted into the container, **avoid running this tool from directories like root (`/`) or `/etc` or other sensitive ones**. In such cases you are giving the AI access to your entire machine or to other sensitive data, defeating the purpose of the sandbox. Always `cd` into your specific project folder first.
 
 Everywhere else Claude writes is either in the container's ephemeral filesystem (discarded on exit thanks to `--rm`) or simply has no path to land at — the Linux kernel's mount namespace makes any other host directory invisible to the container. Symlinks inside the project folder pointing to `~/.ssh` or `/etc/passwd` appear broken for the same reason: those targets aren't mounted, so the container can't see them.
 
-> [!NOTE]
 > **Hardlinks are different.** A hardlink is a second name for an existing inode on the same filesystem. If a file inside your project folder is hardlinked to a sensitive file elsewhere on the same filesystem (e.g., `~/.ssh/id_rsa`), the container *can* reach it through the hardlink — the bind-mount exposes the inode, not just the path. This requires the hardlink to already exist in the project folder, so it's a real concern only when you're inspecting code from an untrusted source. Treat unfamiliar projects with the same caution you'd apply to running their code directly: don't run `claude-pod` inside a folder you don't trust.
 
 The tradeoff: the worst case becomes "something bad happens to one project folder," which is recoverable from git, instead of "my entire home directory is exposed."
 
-<details>
-<summary><strong>Customizing the image</strong> (Python, Rust, port mapping examples)</summary>
+## Customizing the image
 
 The image is intentionally minimal: `node:24-slim` + `git` + `curl` + `less` + `jq` + `gh` + Claude Code. Nothing language-specific. Anything your projects need (Python, build tools, other toolchains) you add yourself — edit the `Dockerfile` and re-run `./install.sh`.
 
-### Notes
-
-> The wrapper is a transparent passthrough — there is no `claude-pod --help` or `claude-pod --version` of its own. Those flags would just be forwarded to `bash` inside the container. For Claude's own flags use `claude-pod claude --help` / `claude-pod claude --version`.
-
-> If your project has a host-built `node_modules`, delete it and reinstall inside the container — native binaries don't cross from host OS to container Linux.
-
-### Python
-
-Edit the `apt-get install` line in `Dockerfile`:
-
-```dockerfile
-... git ca-certificates curl less python3 python3-pip python3-venv ...
-```
-
-### Native compilation (e.g. `bcrypt`, `node-gyp`, Python C extensions)
-
-```dockerfile
-... git ca-certificates curl less build-essential ...
-```
-
-### Other language toolchains (Go, Rust, Java, etc.)
-
-Add a separate `RUN` line below the `apt-get` block. Example for Rust:
-
-```dockerfile
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-```
-
-After any change, re-run `./install.sh` to rebuild.
-
-</details>
-
-<details>
-<summary><strong>Side effects outside the project folder</strong></summary>
+## Side effects outside the project folder
 
 Everything this repo causes to exist outside the project you launch it from:
 
 - `~/.claude-pod/` on your host — auth token, settings, and per-project session/conversation history (transcripts can include code snippets and command output Claude saw). Auth and settings are shared across projects (one login, ever); session history lives under `~/.claude-pod/projects/<encoded-host-path>/`, one folder per project, using the same encoding host-Claude uses — so if you ever switch to a host install, you can copy the folders over and keep your transcripts. This is *not* a host Claude install; it's a state directory for the container's Claude, kept on the host so it survives restarts.
-- Docker image `claude-pod` (~600 MB) and its layers, plus the `node:24-slim` base image, in Docker's image store.
+- Docker image `claude-pod` (~700 MB) and its layers, plus the `node:24-slim` base image, in Docker's image store.
 - Docker build cache from `apt-get` and `npm install` steps.
 - Outbound network during build: Docker Hub, Debian apt mirrors, npm registry. During runtime: `api.anthropic.com` and whatever your project code reaches (network is unrestricted).
 - While a session is running: one container process, and any ports you explicitly mapped via `PORTS` bound on `127.0.0.1`.
 
 No `sudo`, no writes to `/usr/local/`, `/etc/`, `~/.zshrc`, `~/Library/`, your existing `~/.claude/`, or anywhere else on the host.
-
-</details>
 
 ## Uninstall
 
@@ -207,6 +171,12 @@ The wrapper is portable POSIX bash + Docker. It should work on any host with a r
 **Native Windows** (`cmd.exe` / PowerShell) is not supported. The wrapper is a bash script and uses POSIX tools (`id`, etc.); use WSL2 instead.
 
 If a platform doesn't behave as expected, please open an issue.
+
+## Notes
+
+> The wrapper is a transparent passthrough — there is no `claude-pod --help` or `claude-pod --version` of its own. Those flags would just be forwarded to `bash` inside the container. For Claude's own flags use `claude-pod claude --help` / `claude-pod claude --version`.
+
+> If your project has a host-built `node_modules`, delete it and reinstall inside the container — native binaries don't cross from host OS to container Linux.
 
 ## License & trademarks
 
