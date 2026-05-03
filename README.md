@@ -97,6 +97,15 @@ PORTS="8080:80" claude-pod
 PORTS="5173:5173" ~/tools/claude-pod
 ```
 
+> **Bind your dev server to `0.0.0.0` inside the container, not `localhost`.** Most dev servers default to `localhost`, which means they only listen on the container's own loopback — your host browser can't reach them even with `PORTS=...` set. Common fixes:
+> - **Vite:** `npm run dev -- --host` (or `vite --host 0.0.0.0`)
+> - **Next.js:** `next dev -H 0.0.0.0`
+> - **Create React App / webpack-dev-server:** `HOST=0.0.0.0 npm start`
+> - **Django:** `manage.py runserver 0.0.0.0:8000`
+> - **Rails:** `rails s -b 0.0.0.0`
+>
+> The host-side mapping is still `127.0.0.1`-only (forced by `claude-pod`), so binding `0.0.0.0` inside the container does not expose your dev server to your LAN.
+
 ### Updating or pinning the Claude Code version
 
 By default, `install.sh` fetches whatever's currently `latest` on npm, bypassing Docker's cache for that step. To update, just re-run:
