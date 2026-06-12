@@ -77,6 +77,30 @@ if [ -n "${PORTS:-}" ]; then
   done
 fi
 
+# Optional Network Isolation:
+#   By default the container has unrestricted outbound networking — Claude needs api.anthropic.com,
+#   and your builds need the npm/pip/etc. registries. Set NET=none to cut ALL networking for the run.
+#   Use this to inspect or build code from an untrusted source offline: with no network, a malicious
+#   payload can't exfiltrate the project or phone home. Note that Claude itself can't reach Anthropic
+#   in this mode, so it's for sandboxed shell/build work, not for a live Claude session.
+#   NET=none and PORTS are mutually exclusive — you can't publish a port on a container with no network.
+if [ "${NET:-}" = "none" ]; then
+  [ -n "${PORTS:-}" ] && die "NET=none and PORTS are mutually exclusive: a no-network container can't publish ports."
+  DOCKER_FLAGS+=("--network=none")
+fi
+
+# Resource Limits (host availability):
+#   Dropping capabilities does NOT stop fork() or memory allocation, so a runaway or malicious
+#   process inside the container can still fork-bomb or exhaust memory and drag the host down.
+#   --pids-limit caps total processes/threads. The default is generous enough for normal builds;
+#     raise it with PIDS= for very parallel builds, or lower it when running untrusted code.
+#   MEMORY/CPUS are opt-in with no default on purpose: a fixed memory cap would OOM-kill legitimate
+#     large builds, and the right ceiling depends on your host's RAM. Set e.g. MEMORY=4g CPUS=2
+#     when running code you don't trust.
+DOCKER_FLAGS+=("--pids-limit=${PIDS:-4096}")
+[ -n "${MEMORY:-}" ] && DOCKER_FLAGS+=("--memory=$MEMORY")
+[ -n "${CPUS:-}" ]   && DOCKER_FLAGS+=("--cpus=$CPUS")
+
 # Hardening:
 #   --cap-drop=ALL                       Drop all Linux capabilities. An interactive dev shell
 #                                        as an unprivileged user needs none; this closes off

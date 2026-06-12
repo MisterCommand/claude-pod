@@ -106,6 +106,26 @@ PORTS="5173:5173" ~/tools/claude-pod
 >
 > The host-side mapping is still `127.0.0.1`-only (forced by `claude-pod`), so binding `0.0.0.0` inside the container does not expose your dev server to your LAN.
 
+### Network isolation and resource limits
+
+By default the container has **unrestricted outbound network** (Claude needs `api.anthropic.com`, your builds need npm/pip/etc.) and a generous process cap. When you're about to let Claude loose on code from an untrusted source, you can tighten things further with environment variables — all of them just add flags to the same `docker run`, nothing else changes:
+
+```sh
+# Cut ALL networking for the run. A malicious payload can't exfiltrate the project or phone home.
+# Note: Claude itself can't reach Anthropic with no network, so this is for offline shell/build
+# work (inspecting or building untrusted code), not for a live Claude session.
+NET=none claude-pod
+
+# Cap memory and CPU so a runaway or malicious build can't exhaust the host (recoverable via OOM,
+# but disruptive). No default cap — a fixed limit would kill legitimate large builds.
+MEMORY=4g CPUS=2 claude-pod
+
+# Lower the process/thread cap when running untrusted code (default is 4096, generous for builds).
+PIDS=512 claude-pod
+```
+
+`NET=none` and `PORTS` are mutually exclusive — a container with no network can't publish ports. `--pids-limit` is always applied (it contains fork bombs, which dropped capabilities do *not* prevent); raise `PIDS=` if a very parallel build hits the ceiling.
+
 ### Updating or pinning the Claude Code version
 
 By default, `install.sh` fetches whatever's currently `latest` on npm, bypassing Docker's cache for that step. To update, just re-run:
@@ -135,7 +155,7 @@ The image is intentionally minimal: `node:24-slim` + `git` + `curl` + `less` + `
 
 **Still exposed:**
 - **The project folder itself.** Anything inside it — `.env`, `.git/config` (which can carry credentials for private remotes), private keys committed by mistake, `node_modules`, sibling worktrees, scratch files — is fully readable *and* writable by code running in the container. Don't run `claude-pod` from a folder whose contents you wouldn't trust the AI (or a malicious dependency it just installed) to see and modify.
-- **The network.** Outbound is unrestricted. A malicious payload could exfiltrate the project contents or burn your Anthropic API quota.
+- **The network.** Outbound is unrestricted by default. A malicious payload could exfiltrate the project contents or burn your Anthropic API quota. For offline work you can cut networking entirely with `NET=none` (see [Network isolation and resource limits](#network-isolation-and-resource-limits)), but that also takes Claude itself offline — there's no built-in egress allowlist that would keep Claude online while blocking everything else.
 - **Your Anthropic login** (stored in `~/.claude-pod/` on the host, separate from any host Claude install, shared across sandboxed projects).
 
 **Where Claude can actually write** — two paths, both intentional bind mounts:
