@@ -1,56 +1,76 @@
 # claude-pod
 
-> Docker sandbox for Claude Code CLI. Use `--dangerously-skip-permissions` safely — Claude only sees the project folder you launched from. Unofficial sandbox.
+> Docker sandbox for the Claude Code CLI. Runs Claude against one project folder — including with `--dangerously-skip-permissions` — while your home directory, SSH keys, and other projects stay invisible to the container. Unofficial.
 
 ![claude-pod](assets/cover.jpeg)
 
-## Install & Run
+## TL;DR
+
+`claude-pod` runs Claude Code inside a Docker container that mounts the project folder you launch it from. Claude can read and edit that folder; the rest of your machine — home directory, SSH keys, other projects, host shell — isn't mounted, so the container can't see it.
+
+It's useful in two cases:
+
+- With `--dangerously-skip-permissions`: you get auto-approval without giving Claude access to your whole machine.
+- In normal, prompt-by-prompt mode: the container still caps the blast radius, so an over-broad command, prompt injection, or a malicious dependency can't reach past the project folder.
+
+It's not full isolation — here's the boundary:
+
+- ✅ **Outside the launch folder is unreachable.** Your home directory, `~/.ssh`, `~/.aws`, other projects, and the host shell aren't mounted, so the container can't see them.
+- ⚠️ **Inside the launch folder is fully exposed.** Any `.env`, `.git/config`, or keys in it are readable and writable; outbound network is open, so contents can be read or exfiltrated; and your Anthropic login is stored on the host under `~/.claude-pod/`.
+- 🚫 **Don't launch from `~` or `/` or other sensitive folders.** That mounts your whole home or filesystem into the container and defeats the point.
+
+The practical effect: the worst case is narrowed from "your whole machine" to "this one folder," which is recoverable from git.
 
 ```sh
-# Clone this repo (once)
+# Clone this repo once, anywhere you like (~/tools/claude-pod is just an example)
 git clone https://github.com/trekhleb/claude-pod.git ~/tools/claude-pod
 
-# Build claude-pod Docker image (once)
+# Build the image (once)
 cd ~/tools/claude-pod && ./install.sh
 
-# Navigate to the project you want to build with Claude Code
-# cd ~/projects/awesome-new-project
-
-# Launch Claude Code safely inside claude-pod container in "auto-approval" mode
+# cd into your project, then launch Claude
+cd ~/projects/your-project
 ~/tools/claude-pod/claude-pod claude --dangerously-skip-permissions
 ```
 
-Docker is the only requirement. The install path (`~/tools/claude-pod`) is just an example — put it wherever you want.
+Docker is the only requirement — no Node.js, npm, or `claude` needed on your host. For the full threat model and the four-file design, see [Security and limits](#security-and-limits). For the official approach, see Anthropic's [Claude Code sandboxing documentation](https://code.claude.com/docs/en/sandboxing).
 
-**The outcome:** You can run Claude Code in auto-approval mode, skipping the need to approve every single change, without exposing your whole machine. `claude-pod` launches Claude inside a Docker container with only your current project folder mounted, so Claude can read and edit that project, but not your home directory, SSH keys, other projects, or host shell. This turns the main risk from “Claude can touch my machine” into “Claude can touch this project folder.” Read more about [what is and isn't isolated](#what-is-and-isnt-isolated).
+## Contents
 
-Prefer the official approach? See Anthropic's [Claude Code sandboxing documentation](https://code.claude.com/docs/en/sandboxing).
-
-## Requirements
-
-**Just Docker.** 
-
-Claude Code runs inside the container, not on your host — you do not need Node.js, npm, or the `claude` CLI installed on your machine. The host stays untouched apart from one state folder (`~/.claude-pod/`) that exists only to keep your login across container restarts.
-
-## What it actually does
-
-The whole tool is four tiny files:
-
-- **`Dockerfile`** — `node:24-slim` + `git` + `curl` + `less` + `jq` + `gh` + `@anthropic-ai/claude-code`.
-- **`claude-pod`** — one `docker run` command that mounts your current directory and nothing else.
-- **`install.sh`** — checks Docker and builds the image. Doesn't touch any system path; the tool stays self-contained in this folder.
-- **`uninstall.sh`** — removes the image and `~/.claude-pod/` (auth + session history) after confirmation. Lists what it doesn't touch so you can clean those up yourself.
+- [Usage](#usage)
+  - [Requirements](#requirements)
+  - [Running claude-pod](#running-claude-pod)
+  - [Aliases](#aliases)
+  - [First launch (login)](#first-launch-login)
+  - [Exposing ports](#exposing-ports)
+  - [Updating or pinning the Claude Code version](#updating-or-pinning-the-claude-code-version)
+  - [Customizing the image](#customizing-the-image)
+- [Security and limits](#security-and-limits)
+  - [What it actually does](#what-it-actually-does)
+  - [What is and isn't isolated](#what-is-and-isnt-isolated)
+  - [Network isolation and resource limits](#network-isolation-and-resource-limits)
+  - [Side effects outside the project folder](#side-effects-outside-the-project-folder)
+- [Reference](#reference)
+  - [Platforms](#platforms)
+  - [Uninstall](#uninstall)
+  - [License and trademarks](#license-and-trademarks)
 
 ## Usage
+
+### Requirements
+
+**Just Docker.** Claude Code runs inside the container, not on your host — you do not need Node.js, npm, or the `claude` CLI installed on your machine. The host stays untouched apart from one state folder (`~/.claude-pod/`) that exists only to keep your login across container restarts.
+
+### Running claude-pod
 
 Call the script using its full or relative path from any project:
 
 ```sh
-cd ~/Projects/anything
+cd ~/projects/anything
 ~/tools/claude-pod/claude-pod
 ```
 
-You land in a bash shell at the same path your project lives at on the host (e.g. `/Users/you/Projects/anything`), with `claude` on `PATH`. Run it however you like:
+You land in a bash shell at the same path your project lives at on the host (e.g. `/Users/you/projects/anything`), with `claude` on `PATH`. Run it however you like:
 
 ```sh
 claude --dangerously-skip-permissions
@@ -69,8 +89,8 @@ To exit, type `exit`.
 For your convenience, you can add the following aliases to your shell configuration file (`~/.zshrc`, `~/.bashrc`, etc.):
 
 ```sh
-alias claude-pod=~/tools/claude-pod/claude-pod                                  
-alias cc='~/tools/claude-pod/claude-pod claude --dangerously-skip-permissions'  
+alias claude-pod=~/tools/claude-pod/claude-pod
+alias cc='~/tools/claude-pod/claude-pod claude --dangerously-skip-permissions'
 ```
 
 The shell-first form is more flexible, since you can run `npm install`, dev server, tests, then `claude` directly inside the container, so it is the default.
@@ -106,26 +126,6 @@ PORTS="5173:5173" ~/tools/claude-pod
 >
 > The host-side mapping is still `127.0.0.1`-only (forced by `claude-pod`), so binding `0.0.0.0` inside the container does not expose your dev server to your LAN.
 
-### Network isolation and resource limits
-
-By default the container has **unrestricted outbound network** (Claude needs `api.anthropic.com`, your builds need npm/pip/etc.) and a generous process cap. When you're about to let Claude loose on code from an untrusted source, you can tighten things further with environment variables — all of them just add flags to the same `docker run`, nothing else changes:
-
-```sh
-# Cut ALL networking for the run. A malicious payload can't exfiltrate the project or phone home.
-# Note: Claude itself can't reach Anthropic with no network, so this is for offline shell/build
-# work (inspecting or building untrusted code), not for a live Claude session.
-NET=none claude-pod
-
-# Cap memory and CPU so a runaway or malicious build can't exhaust the host (recoverable via OOM,
-# but disruptive). No default cap — a fixed limit would kill legitimate large builds.
-MEMORY=4g CPUS=2 claude-pod
-
-# Lower the process/thread cap when running untrusted code (default is 4096, generous for builds).
-PIDS=512 claude-pod
-```
-
-`NET=none` and `PORTS` are mutually exclusive — a container with no network can't publish ports. `--pids-limit` is always applied (it contains fork bombs, which dropped capabilities do *not* prevent); raise `PIDS=` if a very parallel build hits the ceiling.
-
 ### Updating or pinning the Claude Code version
 
 By default, `install.sh` fetches whatever's currently `latest` on npm, bypassing Docker's cache for that step. To update, just re-run:
@@ -147,7 +147,18 @@ Pinned versions cache normally across rebuilds. The script prints the resolved v
 
 The image is intentionally minimal: `node:24-slim` + `git` + `curl` + `less` + `jq` + `gh` + Claude Code. Nothing language-specific. Anything your projects need (Python, build tools, other toolchains) you add yourself — edit the `Dockerfile` and re-run `./install.sh`.
 
-## What is and isn't isolated
+## Security and limits
+
+### What it actually does
+
+The whole tool is four tiny files:
+
+- **`Dockerfile`** — `node:24-slim` + `git` + `curl` + `less` + `jq` + `gh` + `@anthropic-ai/claude-code`.
+- **`claude-pod`** — one `docker run` command that mounts your current directory (plus a small state dir for login and history) and nothing else of your machine.
+- **`install.sh`** — checks Docker and builds the image. Doesn't touch any system path; the tool stays self-contained in this folder.
+- **`uninstall.sh`** — removes the image and `~/.claude-pod/` (auth + session history) after confirmation. Lists what it doesn't touch so you can clean those up yourself.
+
+### What is and isn't isolated
 
 **Safe from Claude:**
 - Everything outside the project folder you launched from. `~/.ssh`, `~/.aws`, `~/.zshrc`, browser data, other projects — all unreachable.
@@ -170,7 +181,27 @@ Everywhere else Claude writes is either in the container's ephemeral filesystem 
 
 The tradeoff: the worst case becomes "something bad happens to one project folder," which is recoverable from git, instead of "my entire home directory is exposed."
 
-## Side effects outside the project folder
+### Network isolation and resource limits
+
+By default the container has **unrestricted outbound network** (Claude needs `api.anthropic.com`, your builds need npm/pip/etc.) and a generous process cap. When you're about to let Claude loose on code from an untrusted source, you can tighten things further with environment variables — all of them just add flags to the same `docker run`, nothing else changes:
+
+```sh
+# Cut ALL networking for the run. A malicious payload can't exfiltrate the project or phone home.
+# Note: Claude itself can't reach Anthropic with no network, so this is for offline shell/build
+# work (inspecting or building untrusted code), not for a live Claude session.
+NET=none claude-pod
+
+# Cap memory and CPU so a runaway or malicious build can't exhaust the host (recoverable via OOM,
+# but disruptive). No default cap — a fixed limit would kill legitimate large builds.
+MEMORY=4g CPUS=2 claude-pod
+
+# Lower the process/thread cap when running untrusted code (default is 4096, generous for builds).
+PIDS=512 claude-pod
+```
+
+`NET=none` and `PORTS` are mutually exclusive — a container with no network can't publish ports. `--pids-limit` is always applied (it contains fork bombs, which dropped capabilities do *not* prevent); raise `PIDS=` if a very parallel build hits the ceiling.
+
+### Side effects outside the project folder
 
 Everything this repo causes to exist outside the project you launch it from:
 
@@ -182,17 +213,9 @@ Everything this repo causes to exist outside the project you launch it from:
 
 No `sudo`, no writes to `/usr/local/`, `/etc/`, `~/.zshrc`, `~/Library/`, your existing `~/.claude/`, or anywhere else on the host.
 
-## Uninstall
+## Reference
 
-```sh
-./uninstall.sh
-```
-
-Removes `~/.claude-pod/` and the `claude-pod` image after confirmation. Tells you exactly what it isn't touching (`node:24-slim`, build cache, this repo) and how to clean those up yourself.
-
-If you added a shell alias for convenience (e.g. `alias claude-pod=...` or `alias cc=...` in `~/.zshrc` / `~/.bashrc`), remove that line too — `uninstall.sh` doesn't touch your shell rc files.
-
-## Platforms
+### Platforms
 
 The wrapper is portable POSIX bash + Docker. It should work on any host with a recent Docker:
 
@@ -204,7 +227,17 @@ The wrapper is portable POSIX bash + Docker. It should work on any host with a r
 
 If a platform doesn't behave as expected, please open an issue.
 
-## License & trademarks
+### Uninstall
+
+```sh
+./uninstall.sh
+```
+
+Removes `~/.claude-pod/` and the `claude-pod` image after confirmation. Tells you exactly what it isn't touching (`node:24-slim`, build cache, this repo) and how to clean those up yourself.
+
+If you added a shell alias for convenience (e.g. `alias claude-pod=...` or `alias cc=...` in `~/.zshrc` / `~/.bashrc`), remove that line too — `uninstall.sh` doesn't touch your shell rc files.
+
+### License and trademarks
 
 The code in this repository is released under the MIT License — see [`LICENSE`](LICENSE) for the full text.
 
