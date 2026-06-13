@@ -25,8 +25,8 @@ The practical effect: the worst case is narrowed from "your whole machine" to "t
 # Clone this repo once, anywhere you like (~/tools/claude-pod is just an example)
 git clone https://github.com/trekhleb/claude-pod.git ~/tools/claude-pod
 
-# Build the image (once)
-cd ~/tools/claude-pod && ./install.sh
+# Build the image (once) — runs from anywhere, no cd needed
+~/tools/claude-pod/install.sh
 
 # cd into your project, then launch Claude
 cd ~/projects/your-project
@@ -128,17 +128,16 @@ PORTS="5173:5173" ~/tools/claude-pod
 
 ### Updating or pinning the Claude Code version
 
-By default, `install.sh` fetches whatever's currently `latest` on npm, bypassing Docker's cache for that step. To update, just re-run:
+By default, `install.sh` fetches whatever's currently `latest` on npm, bypassing Docker's cache for that step. It resolves its own location, so you can re-run it from any folder:
 
 ```sh
-cd ~/tools/claude-pod
-./install.sh
+~/tools/claude-pod/install.sh
 ```
 
 To pin a specific version, set `CLAUDE_CODE_VERSION`:
 
 ```sh
-CLAUDE_CODE_VERSION=2.0.0 ./install.sh
+CLAUDE_CODE_VERSION=2.0.0 ~/tools/claude-pod/install.sh
 ```
 
 Pinned versions cache normally across rebuilds. The script prints the resolved version after each build, so you always know what you got.
