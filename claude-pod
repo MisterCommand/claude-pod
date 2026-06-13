@@ -7,6 +7,29 @@ BOLD=$'\e[1m'; RED=$'\e[31m'; RESET=$'\e[0m'
 err() { printf '%s✗%s %s\n' "$RED" "$RESET" "$*" >&2; }
 die() { err "$*"; exit 1; }
 
+# --help / -h: print copy-pastable usage and exit BEFORE any Docker work, so help still works when
+# Docker is down or the image isn't built yet. We resolve our own location so every command printed
+# below is copy-pastable as-is — no matter where the repo was cloned or whether the alias is set up.
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  row() { printf '  %-18s %s%s%s\n' "$1" "$BOLD" "$2" "$RESET"; }
+  printf '%sclaude-pod%s — run Claude Code in a Docker sandbox scoped to the current folder.\n' "$BOLD" "$RESET"
+  printf '\n%sRun%s  (cd into your project first — the current folder is what gets mounted):\n' "$BOLD" "$RESET"
+  row "Open a shell:"   "$HERE/claude-pod"
+  row "Run Claude:"     "$HERE/claude-pod claude --dangerously-skip-permissions"
+  printf '\n%sManage%s  (works from any folder):\n' "$BOLD" "$RESET"
+  row "Install/update:" "$HERE/install.sh"
+  row "Pin a version:"  "CLAUDE_CODE_VERSION=2.0.0 $HERE/install.sh"
+  row "Uninstall:"      "$HERE/uninstall.sh"
+  printf '\n%sOptions%s  (prefix any run command):\n' "$BOLD" "$RESET"
+  row "Publish ports:"  "PORTS=\"3000 5173\" $HERE/claude-pod"
+  row "Isolate/limit:"  "NET=none MEMORY=4g PIDS=512 $HERE/claude-pod"
+  printf '\n'
+  row "Shortcut alias:" "alias claude-pod=$HERE/claude-pod"
+  row "Full README:"    "https://github.com/trekhleb/claude-pod"
+  exit 0
+fi
+
 # Preflight checks, in causal order. Without these the failures surface as cryptic Docker errors:
 #   - daemon down -> the image check below would falsely blame a missing image.
 #   - missing image -> Docker would try to pull 'claude-pod' from Docker Hub and fail.

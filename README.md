@@ -31,6 +31,11 @@ git clone https://github.com/trekhleb/claude-pod.git ~/tools/claude-pod
 # cd into your project, then launch Claude
 cd ~/projects/your-project
 ~/tools/claude-pod/claude-pod claude --dangerously-skip-permissions
+
+# Long path? You can alias it — see "Aliases" below.
+
+# Forgot a command later? Print a copy-pastable cheatsheet of all of them
+~/tools/claude-pod/claude-pod --help
 ```
 
 Docker is the only requirement — no Node.js, npm, or `claude` needed on your host. For the full threat model and the four-file design, see [Security and limits](#security-and-limits). For the official approach, see Anthropic's [Claude Code sandboxing documentation](https://code.claude.com/docs/en/sandboxing).
@@ -84,16 +89,17 @@ Alternatively, you may skip the shell and go straight into Claude. Anything you 
 
 To exit, type `exit`.
 
+Forgot a command later? Run `~/tools/claude-pod/claude-pod --help` (or `-h`) anytime — it prints a copy-pastable cheatsheet of every command (run, install, update, uninstall, options), with the correct absolute paths for your install.
+
 ### Aliases
 
-For your convenience, you can add the following aliases to your shell configuration file (`~/.zshrc`, `~/.bashrc`, etc.):
+For your convenience, you can add an alias to your shell configuration file (`~/.zshrc`, `~/.bashrc`, etc.):
 
 ```sh
 alias claude-pod=~/tools/claude-pod/claude-pod
-alias cc='~/tools/claude-pod/claude-pod claude --dangerously-skip-permissions'
 ```
 
-The shell-first form is more flexible, since you can run `npm install`, dev server, tests, then `claude` directly inside the container, so it is the default.
+This is the shell-first form: `claude-pod` drops you into the container with `claude` on `PATH`, so you can run `npm install`, a dev server, or tests and then start `claude` yourself — all inside the sandbox. The same alias also goes straight into Claude when you pass the command through: `claude-pod claude --dangerously-skip-permissions`.
 
 ### First launch (login)
 
