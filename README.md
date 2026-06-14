@@ -211,7 +211,7 @@ PIDS=512 claude-pod
 Everything this repo causes to exist outside the project you launch it from:
 
 - `~/.claude-pod/` on your host — auth token, settings, and per-project session/conversation history (transcripts can include code snippets and command output Claude saw). Auth and settings are shared across projects (one login, ever); session history lives under `~/.claude-pod/projects/<encoded-host-path>/`, one folder per project, using the same encoding host-Claude uses — so if you ever switch to a host install, you can copy the folders over and keep your transcripts. This is *not* a host Claude install; it's a state directory for the container's Claude, kept on the host so it survives restarts.
-- Docker image `claude-pod` (~700 MB) and its layers, plus the `node:24-slim` base image, in Docker's image store.
+- Docker image `claude-pod` and its layers, plus the `node:24-slim` base image, in Docker's image store.
 - Docker build cache from `apt-get` and `npm install` steps.
 - Outbound network during build: Docker Hub, Debian apt mirrors, npm registry. During runtime: `api.anthropic.com` and whatever your project code reaches (network is unrestricted).
 - While a session is running: one container process, and any ports you explicitly mapped via `PORTS` bound on `127.0.0.1`.

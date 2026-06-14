@@ -24,7 +24,23 @@ RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 # Create a dedicated, globally writable home directory for our dynamic runtime user.
 RUN mkdir -p /home/claude-pod && chmod 777 /home/claude-pod
 
-# Override the default bash prompt to hide the "I have no name!" warning for dynamic users.
-RUN echo 'PS1="claude-pod:\w\$ "' >> /etc/bash.bashrc
+# Interactive-shell setup, appended to /etc/bash.bashrc. Only interactive bash sources this file, so
+# none of it touches the non-interactive `claude-pod claude ...` path. The dynamic, /etc/passwd-less
+# user has no $HOME/.bashrc of its own, so these baseline conveniences have to live in the system-wide
+# rc. Heredoc keeps the escapes readable (BuildKit, which install.sh already requires via
+# --progress=plain, supports it).
+RUN cat >> /etc/bash.bashrc <<'EOF'
+
+# Colored prompt: green label, blue path — the conventional Debian default look. \[...\] wraps the
+# non-printing escapes so bash measures the prompt width correctly. The "claude-pod" label also
+# hides the "I have no name!" warning a dynamic, passwd-less user would otherwise show.
+PS1='\[\e[1;32m\]claude-pod\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
+
+# Basic, conventional coloring for the most-used commands. dircolors supplies the standard LS_COLORS
+# palette; the aliases enable color only when output is a terminal (so piped output stays clean).
+if command -v dircolors >/dev/null 2>&1; then eval "$(dircolors -b)"; fi
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+EOF
 
 CMD ["bash"]
