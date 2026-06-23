@@ -48,6 +48,7 @@ Docker is the only requirement — no Node.js, npm, or `claude` needed on your h
   - [Aliases](#aliases)
   - [First launch (login)](#first-launch-login)
   - [Exposing ports](#exposing-ports)
+  - [Pasting images and screenshots](#pasting-images-and-screenshots)
   - [Updating or pinning the Claude Code version](#updating-or-pinning-the-claude-code-version)
   - [Customizing the image](#customizing-the-image)
 - [Security and limits](#security-and-limits)
@@ -131,6 +132,17 @@ PORTS="5173:5173" ~/tools/claude-pod/claude-pod
 > - **Rails:** `rails s -b 0.0.0.0`
 >
 > The host-side mapping is still `127.0.0.1`-only (forced by `claude-pod`), so binding `0.0.0.0` inside the container does not expose your dev server to your LAN.
+
+### Pasting images and screenshots
+
+Claude can only read files that live **inside the project folder** — that's the one directory bind-mounted into the container. Images on your Desktop or in Downloads aren't mounted, so pasting one straight from there hands Claude a path it can't reach. This is the same isolation that keeps the rest of your machine private from the container ([What is and isn't isolated](#what-is-and-isnt-isolated)); the small bit of friction below is the price for not exposing those default locations.
+
+The workaround:
+
+1. Take the screenshot as usual (it lands on the Desktop, or wherever your OS drops it).
+2. Copy the file into your project folder — anywhere under it works, e.g. a `tmp/` subfolder.
+3. **Re-copy the file from that new in-project location**, so the path on your clipboard points at the copy that's actually synced into the container.
+4. Paste into Claude. The path now resolves inside the container and the image is recognized.
 
 ### Updating or pinning the Claude Code version
 
