@@ -70,7 +70,7 @@ class SessionManager {
       prompt,
       options: {
         cwd: getConfig().BASE_PROJECT_DIR,
-        permissionMode: "default",
+        permissionMode: "bypassPermissions",
         env: {
           ...process.env,
           ANTHROPIC_API_KEY: undefined,
