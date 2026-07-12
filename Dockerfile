@@ -1,4 +1,3 @@
-```dockerfile
 # If you bump this tag, also update the literal in uninstall.sh.
 FROM node:22-slim
 
@@ -61,4 +60,3 @@ alias grep='grep --color=auto'
 EOF
 
 CMD ["bash"]
-```
