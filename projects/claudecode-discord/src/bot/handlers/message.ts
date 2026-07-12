@@ -141,7 +141,7 @@ export async function handleMessage(message: Message): Promise<void> {
   const parsed = parseContextToken(raw);
   raw = parsed.content;
   const ambient = await previousHumanMessages(message, parsed.count);
-  const explicitReference = !referencedChain && referenced && !referenced.author.bot ? [referenced] : [];
+  const explicitReference = !referencedChain && referenced && referenced.author.id !== message.client.user.id ? [referenced] : [];
   const contextMessages = [...ambient];
   if (explicitReference.length && !contextMessages.some((item) => item.id === referenced!.id)) contextMessages.push(referenced!);
 
